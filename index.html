@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gensyn Glitch Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brand: {
+                bg: '#0a0a0a',
+                accent: '#fad7d1', // Pinkish white
+                secondary: '#230800', // Deep brown
+                white: '#ffffff',
+              }
+            },
+            fontFamily: {
+              mono: ['"Courier New"', 'Courier', 'monospace'],
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      body {
+        background-color: #0a0a0a;
+        color: #fad7d1;
+        overflow: hidden; /* Prevent body scroll, handle in app */
+      }
+      /* Custom scrollbar for webkit */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0a0a0a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #230800; 
+        border: 1px solid #fad7d1;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #fad7d1;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
