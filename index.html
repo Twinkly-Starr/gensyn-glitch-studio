@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gensyn Glitch Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -25,28 +25,75 @@
       }
     </script>
     <style>
-      body {
-        background-color: #0a0a0a;
-        color: #fad7d1;
-        overflow: hidden; /* Prevent body scroll, handle in app */
-      }
-      /* Custom scrollbar for webkit */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #0a0a0a; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #230800; 
-        border: 1px solid #fad7d1;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #fad7d1;
-      }
+        body {
+            background-color: #0a0a0a;
+            color: #fad7d1;
+            overflow: hidden; /* App handles scrolling */
+            margin: 0;
+        }
+
+        /* Explicit Mobile Layout Fix */
+        @media (max-width: 768px) {
+            #app-container {
+                flex-direction: column;
+            }
+            #canvas-wrapper {
+                height: 60vh !important;
+                width: 100%;
+                top: 0;
+            }
+            #controls-wrapper {
+                height: 40vh !important;
+                width: 100%;
+                bottom: 0;
+                overflow-y: auto;
+            }
+        }
+
+        /* Desktop Layout */
+        @media (min-width: 769px) {
+            #app-container {
+                flex-direction: row-reverse;
+            }
+            #canvas-wrapper {
+                height: 100vh;
+                flex: 1;
+            }
+            #controls-wrapper {
+                height: 100vh;
+                width: 340px;
+                overflow-y: auto;
+            }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #230800; border: 1px solid #fad7d1; }
+        ::-webkit-scrollbar-thumb:hover { background: #fad7d1; }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            background: #fad7d1;
+            margin-top: -6px;
+            cursor: pointer;
+            border: none;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #230800;
+        }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
@@ -56,7 +103,604 @@
 }
 </script>
 </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<body>
+    <div id="app-container" class="flex w-full h-screen bg-brand-bg">
+        
+        <!-- Canvas Area -->
+        <div id="canvas-wrapper" class="relative bg-black flex items-center justify-center overflow-hidden bg-[radial-gradient(#230800_1px,transparent_1px)] [background-size:16px_16px]">
+            <div id="no-signal" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span class="text-brand-accent/30 font-mono text-xl animate-pulse">NO SIGNAL_</span>
+            </div>
+            <canvas id="main-canvas" class="shadow-2xl border border-brand-secondary/50 object-contain max-w-full max-h-full hidden"></canvas>
+            <div id="loading" class="absolute top-4 right-4 text-brand-accent font-mono text-xs bg-black px-2 py-1 border border-brand-accent hidden">PROCESSING...</div>
+        </div>
+
+        <!-- Controls Area -->
+        <div id="controls-wrapper" class="bg-brand-bg border-r border-brand-accent/20 p-6 flex flex-col gap-6">
+            
+            <!-- Header -->
+            <div class="border-b-2 border-brand-accent pb-4">
+                <h1 class="text-2xl font-mono font-bold text-brand-white tracking-tighter">GENSYN</h1>
+                <h2 class="text-xs font-mono text-brand-accent mt-1 tracking-widest">GLITCH STUDIO v1.0</h2>
+            </div>
+
+            <!-- I/O -->
+            <div class="space-y-3">
+                <label class="block w-full cursor-pointer group">
+                    <input type="file" id="file-upload" accept="image/*" class="hidden">
+                    <div class="w-full border border-dashed border-brand-accent p-3 text-center group-hover:bg-brand-secondary/30 transition-colors">
+                        <span class="font-mono text-xs text-brand-accent uppercase">Load Source Image</span>
+                    </div>
+                </label>
+                <button id="save-btn" class="w-full font-mono text-sm px-4 py-2 border border-brand-accent text-brand-accent bg-brand-bg hover:bg-brand-accent hover:text-brand-secondary transition-colors uppercase">
+                    Save .PNG
+                </button>
+            </div>
+
+            <!-- Global -->
+            <div>
+                <h3 class="text-brand-white font-mono text-sm font-bold mb-4 uppercase border-l-2 border-brand-accent pl-2">Global</h3>
+                <div class="flex items-center justify-between cursor-pointer" id="toggle-grayscale">
+                    <span class="font-mono text-xs uppercase text-brand-accent opacity-80 select-none">Grayscale</span>
+                    <div class="w-10 h-5 border border-brand-accent flex items-center p-0.5 justify-start" id="toggle-grayscale-bg">
+                        <div class="w-3 h-3 bg-brand-accent opacity-40 transition-all" id="toggle-grayscale-dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Glitch FX -->
+            <div>
+                <h3 class="text-brand-white font-mono text-sm font-bold mb-4 uppercase border-l-2 border-brand-accent pl-2">Glitch FX</h3>
+                
+                <div class="mb-4">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Pixelate</label>
+                        <span class="font-mono text-xs text-brand-white" id="val-pixelate">0</span>
+                    </div>
+                    <input type="range" id="input-pixelate" min="0" max="100" value="0">
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">RGB Shift</label>
+                        <span class="font-mono text-xs text-brand-white" id="val-rgb">0</span>
+                    </div>
+                    <input type="range" id="input-rgb" min="0" max="100" value="0">
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Glitch Slice</label>
+                        <span class="font-mono text-xs text-brand-white" id="val-glitch">0</span>
+                    </div>
+                    <input type="range" id="input-glitch" min="0" max="100" value="0">
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Noise</label>
+                        <span class="font-mono text-xs text-brand-white" id="val-noise">0</span>
+                    </div>
+                    <input type="range" id="input-noise" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <!-- Dither -->
+            <div>
+                <h3 class="text-brand-white font-mono text-sm font-bold mb-4 uppercase border-l-2 border-brand-accent pl-2">Dither</h3>
+                
+                <div class="mb-4">
+                    <label class="font-mono text-xs uppercase text-brand-accent opacity-80 block mb-1">Algorithm</label>
+                    <select id="select-dither" class="w-full bg-brand-bg border border-brand-accent text-brand-accent font-mono text-sm p-2 rounded-none focus:outline-none">
+                        <option value="none">None</option>
+                        <option value="threshold">Threshold (1-Bit)</option>
+                        <option value="ordered">Ordered (Bayer)</option>
+                        <option value="floyd">Floyd-Steinberg</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Intensity / Threshold</label>
+                        <span class="font-mono text-xs text-brand-white" id="val-dither-amt">50</span>
+                    </div>
+                    <input type="range" id="input-dither-amt" min="0" max="100" value="50">
+                </div>
+            </div>
+
+            <!-- Logo -->
+            <div class="mb-12">
+                <div class="flex justify-between items-center mb-4 border-l-2 border-brand-accent pl-2">
+                    <h3 class="text-brand-white font-mono text-sm font-bold uppercase">Branding</h3>
+                    <div class="flex items-center cursor-pointer" id="toggle-logo">
+                        <div class="w-10 h-5 border border-brand-accent flex items-center p-0.5 justify-start" id="toggle-logo-bg">
+                            <div class="w-3 h-3 bg-brand-accent opacity-40 transition-all" id="toggle-logo-dot"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="logo-controls" class="space-y-4 opacity-50 pointer-events-none transition-opacity">
+                     <select id="select-logo-color" class="w-full bg-brand-bg border border-brand-accent text-brand-accent font-mono text-sm p-2 rounded-none focus:outline-none">
+                        <option value="white">White</option>
+                        <option value="brown">Brand Brown</option>
+                        <option value="pink">Brand Pink</option>
+                    </select>
+
+                    <div class="flex flex-col gap-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Size</label>
+                        <input type="range" id="input-logo-size" min="10" max="100" value="30">
+                    </div>
+
+                    <div class="flex flex-col gap-1">
+                        <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Opacity</label>
+                        <input type="range" id="input-logo-opacity" min="0" max="100" value="90">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                         <div class="flex flex-col gap-1">
+                            <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Pos X</label>
+                            <input type="range" id="input-logo-x" min="0" max="100" value="50">
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <label class="font-mono text-xs uppercase text-brand-accent opacity-80">Pos Y</label>
+                            <input type="range" id="input-logo-y" min="0" max="100" value="50">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-auto text-[10px] text-brand-accent/40 font-mono text-center pb-4">
+                SYSTEM READY // WAITING FOR INPUT
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+    const LOGOS = {
+        white: 'https://i.postimg.cc/QNcnw0Zd/Gensyn-Logo-Inline-White.png',
+        brown: 'https://i.postimg.cc/DZxb0PFt/Gensyn-Logo-Inline-Brown.png',
+        pink: 'https://i.postimg.cc/DZp8nfdx/Gensyn-Logo-Inline-Pink.png'
+    };
+
+    const BAYER_MATRIX = [
+        [0, 8, 2, 10],
+        [12, 4, 14, 6],
+        [3, 11, 1, 9],
+        [15, 7, 13, 5]
+    ];
+
+    // --- STATE ---
+    const state = {
+        sourceImage: null,
+        filters: {
+            grayscale: false,
+            pixelate: 0,
+            rgbShift: 0, // Fixed naming consistency
+            glitch: 0,
+            noise: 0,
+            ditherType: 'none',
+            ditherAmount: 50
+        },
+        logo: {
+            visible: false,
+            color: 'white',
+            size: 30,
+            opacity: 90,
+            x: 50,
+            y: 50
+        }
+    };
+
+    // Preload logos
+    const logoImages = {};
+    Object.entries(LOGOS).forEach(([key, url]) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = url;
+        logoImages[key] = img;
+    });
+
+    // --- DOM ELEMENTS ---
+    const els = {
+        canvas: document.getElementById('main-canvas'),
+        ctx: document.getElementById('main-canvas').getContext('2d', { willReadFrequently: true }),
+        noSignal: document.getElementById('no-signal'),
+        loading: document.getElementById('loading'),
+        fileInput: document.getElementById('file-upload'),
+        saveBtn: document.getElementById('save-btn'),
+        inputs: {
+            pixelate: document.getElementById('input-pixelate'),
+            rgb: document.getElementById('input-rgb'),
+            glitch: document.getElementById('input-glitch'),
+            noise: document.getElementById('input-noise'),
+            ditherAmt: document.getElementById('input-dither-amt'),
+            ditherType: document.getElementById('select-dither'),
+            grayscale: document.getElementById('toggle-grayscale'),
+            logoVisible: document.getElementById('toggle-logo'),
+            logoColor: document.getElementById('select-logo-color'),
+            logoSize: document.getElementById('input-logo-size'),
+            logoOpacity: document.getElementById('input-logo-opacity'),
+            logoX: document.getElementById('input-logo-x'),
+            logoY: document.getElementById('input-logo-y'),
+        },
+        values: {
+            pixelate: document.getElementById('val-pixelate'),
+            rgb: document.getElementById('val-rgb'),
+            glitch: document.getElementById('val-glitch'),
+            noise: document.getElementById('val-noise'),
+            ditherAmt: document.getElementById('val-dither-amt')
+        },
+        ui: {
+            logoControls: document.getElementById('logo-controls'),
+            grayscaleDot: document.getElementById('toggle-grayscale-dot'),
+            grayscaleBg: document.getElementById('toggle-grayscale-bg'),
+            logoDot: document.getElementById('toggle-logo-dot'),
+            logoBg: document.getElementById('toggle-logo-bg'),
+        }
+    };
+
+    // --- GLITCH DATA CACHE ---
+    let glitchData = [];
+
+    function generateGlitchData(amount, width, height) {
+        const intensity = amount / 100;
+        const numSlices = Math.floor(intensity * 20);
+        const maxOffset = width * 0.1 * intensity;
+        
+        const slices = [];
+        for (let i = 0; i < numSlices; i++) {
+            slices.push({
+                h: Math.random() * (height * 0.2),
+                y: Math.random() * height,
+                off: (Math.random() - 0.5) * 2 * maxOffset
+            });
+        }
+        return slices;
+    }
+
+    // --- RENDER PIPELINE ---
+    let isProcessing = false;
+    let pendingRender = false;
+
+    function scheduleRender() {
+        if (isProcessing) {
+            pendingRender = true;
+            return;
+        }
+        requestAnimationFrame(render);
+    }
+
+    async function render() {
+        if (!state.sourceImage) return;
+        
+        isProcessing = true;
+        els.loading.classList.remove('hidden');
+
+        const width = els.canvas.width;
+        const height = els.canvas.height;
+        const ctx = els.ctx;
+
+        // 0. Clean
+        ctx.clearRect(0, 0, width, height);
+        
+        // 1. Draw Source
+        ctx.drawImage(state.sourceImage, 0, 0, width, height);
+
+        // 2. Pixelate
+        if (state.filters.pixelate > 0) {
+            const amount = state.filters.pixelate;
+            const blockSize = Math.max(1, Math.floor((amount / 100) * 40)) + 1;
+            if (blockSize > 1) {
+                const w = Math.ceil(width / blockSize);
+                const h = Math.ceil(height / blockSize);
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = w; tempCanvas.height = h;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.imageSmoothingEnabled = false;
+                tempCtx.drawImage(els.canvas, 0, 0, w, h);
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(tempCanvas, 0, 0, width, height);
+            }
+        }
+
+        // 3. RGB Shift (Fixed)
+        // We must re-grab the image data after pixelation to shift correctly
+        if (state.filters.rgbShift > 0) {
+            const shift = Math.floor((state.filters.rgbShift / 100) * (width * 0.05));
+            if (shift > 0) {
+                const src = ctx.getImageData(0, 0, width, height);
+                const data = src.data;
+                const copy = new Uint8ClampedArray(data);
+                
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const i = (y * width + x) * 4;
+                        const rX = Math.min(width - 1, Math.max(0, x + shift));
+                        const bX = Math.min(width - 1, Math.max(0, x - shift));
+                        
+                        data[i] = copy[(y * width + rX) * 4];       // Red from right
+                        data[i+1] = copy[(y * width + x) * 4 + 1];  // Green same
+                        data[i+2] = copy[(y * width + bX) * 4 + 2]; // Blue from left
+                    }
+                }
+                ctx.putImageData(src, 0, 0);
+            }
+        }
+
+        // 4. Glitch
+        if (state.filters.glitch > 0 && glitchData.length > 0) {
+            glitchData.forEach(slice => {
+                let y = slice.y;
+                if (y + slice.h > height) y = height - slice.h;
+                if (y < 0) y = 0;
+                ctx.drawImage(els.canvas, 0, y, width, slice.h, slice.off, y, width, slice.h);
+            });
+        }
+
+        // --- Pixel Manipulation Stage ---
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // 5. Grayscale
+        if (state.filters.grayscale) {
+            for (let i = 0; i < data.length; i += 4) {
+                const g = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
+                data[i] = g; data[i+1] = g; data[i+2] = g;
+            }
+        }
+
+        // 6. Noise
+        if (state.filters.noise > 0) {
+            const factor = state.filters.noise;
+            for (let i = 0; i < data.length; i += 4) {
+                const rand = (Math.random() - 0.5) * factor;
+                data[i] += rand;
+                data[i+1] += rand;
+                data[i+2] += rand;
+            }
+        }
+
+        // 7. Dither (Fixed Intensity Logic)
+        const dType = state.filters.ditherType;
+        const dAmt = state.filters.ditherAmount;
+
+        if (dType !== 'none') {
+            // Capture state BEFORE Dither but AFTER Grayscale/Noise for blending
+            const preDitherData = new Uint8ClampedArray(data);
+
+            if (dType === 'threshold') {
+                // For Threshold: Slider controls the Cutoff Point (Black vs White balance)
+                const threshold = (dAmt / 100) * 255;
+                for (let i = 0; i < data.length; i += 4) {
+                    const l = (data[i] + data[i+1] + data[i+2]) / 3;
+                    const v = l > threshold ? 255 : 0;
+                    data[i] = v; data[i+1] = v; data[i+2] = v;
+                }
+            } 
+            else if (dType === 'ordered') {
+                // For Ordered: Slider controls Opacity (Blend)
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const i = (y * width + x) * 4;
+                        const map = BAYER_MATRIX[y % 4][x % 4];
+                        const norm = (map / 16) - 0.5;
+                        const off = norm * 255;
+                        
+                        let r = data[i] + off > 128 ? 255 : 0;
+                        let g = data[i+1] + off > 128 ? 255 : 0;
+                        let b = data[i+2] + off > 128 ? 255 : 0;
+
+                        data[i] = r; data[i+1] = g; data[i+2] = b;
+                    }
+                }
+            } 
+            else if (dType === 'floyd') {
+                // For Floyd: Standard Algorithm
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const i = (y * width + x) * 4;
+                        const oldR = data[i]; const oldG = data[i+1]; const oldB = data[i+2];
+                        const newR = oldR < 128 ? 0 : 255;
+                        const newG = oldG < 128 ? 0 : 255;
+                        const newB = oldB < 128 ? 0 : 255;
+                        
+                        data[i] = newR; data[i+1] = newG; data[i+2] = newB;
+                        
+                        const eR = oldR - newR; const eG = oldG - newG; const eB = oldB - newB;
+                        
+                        const distribute = (dx, dy, f) => {
+                            if (x + dx >= 0 && x + dx < width && y + dy >= 0 && y + dy < height) {
+                                const ni = ((y + dy) * width + (x + dx)) * 4;
+                                data[ni] += eR * f; data[ni+1] += eG * f; data[ni+2] += eB * f;
+                            }
+                        };
+                        distribute(1, 0, 7/16);
+                        distribute(-1, 1, 3/16);
+                        distribute(0, 1, 5/16);
+                        distribute(1, 1, 1/16);
+                    }
+                }
+            }
+
+            // BLENDING STEP (The Fix for Ordered & Floyd)
+            // If type is NOT threshold, use the slider to blend dithered result with original
+            if (dType !== 'threshold') {
+                const blend = dAmt / 100;
+                for (let i = 0; i < data.length; i ++) {
+                    // Simple Linear Interpolation
+                    data[i] = preDitherData[i] * (1 - blend) + data[i] * blend;
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+
+        // 8. Logo Overlay
+        if (state.logo.visible) {
+            const logoImg = logoImages[state.logo.color];
+            if (logoImg && logoImg.complete) {
+                const logoW = width * (state.logo.size / 100);
+                const logoH = logoW * (logoImg.height / logoImg.width);
+                const posX = (width * (state.logo.x / 100)) - (logoW / 2);
+                const posY = (height * (state.logo.y / 100)) - (logoH / 2);
+                
+                ctx.save();
+                ctx.globalAlpha = state.logo.opacity / 100;
+                ctx.drawImage(logoImg, posX, posY, logoW, logoH);
+                ctx.restore();
+            }
+        }
+
+        els.loading.classList.add('hidden');
+        isProcessing = false;
+        if (pendingRender) {
+            pendingRender = false;
+            requestAnimationFrame(render);
+        }
+    }
+
+    // --- EVENTS ---
+    
+    function updateVal(key, val) {
+        if (els.values[key]) els.values[key].textContent = val;
+    }
+
+    // Generic Filter Inputs
+    ['pixelate', 'noise'].forEach(key => {
+        els.inputs[key].addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            state.filters[key] = val;
+            updateVal(key, val);
+            scheduleRender();
+        });
+    });
+
+    // RGB FIX: Explicit Listener to match 'rgbShift' state key
+    els.inputs.rgb.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.filters.rgbShift = val; // Store in correct state variable
+        updateVal('rgb', val);
+        scheduleRender();
+    });
+
+    // Glitch Special Case (Generates Data)
+    els.inputs.glitch.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.filters.glitch = val;
+        updateVal('glitch', val);
+        if (state.sourceImage) {
+            glitchData = generateGlitchData(val, els.canvas.width, els.canvas.height);
+        }
+        scheduleRender();
+    });
+
+    // Dither Inputs
+    els.inputs.ditherAmt.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        state.filters.ditherAmount = val;
+        updateVal('ditherAmt', val);
+        scheduleRender();
+    });
+
+    els.inputs.ditherType.addEventListener('change', (e) => {
+        state.filters.ditherType = e.target.value;
+        scheduleRender();
+    });
+
+    // Grayscale Toggle
+    els.inputs.grayscale.addEventListener('click', () => {
+        state.filters.grayscale = !state.filters.grayscale;
+        const active = state.filters.grayscale;
+        els.ui.grayscaleBg.classList.toggle('justify-end', active);
+        els.ui.grayscaleBg.classList.toggle('justify-start', !active);
+        els.ui.grayscaleDot.classList.toggle('opacity-100', active);
+        els.ui.grayscaleDot.classList.toggle('opacity-40', !active);
+        scheduleRender();
+    });
+
+    // Logo Toggle
+    els.inputs.logoVisible.addEventListener('click', () => {
+        state.logo.visible = !state.logo.visible;
+        const active = state.logo.visible;
+        els.ui.logoBg.classList.toggle('justify-end', active);
+        els.ui.logoBg.classList.toggle('justify-start', !active);
+        els.ui.logoDot.classList.toggle('opacity-100', active);
+        els.ui.logoDot.classList.toggle('opacity-40', !active);
+        
+        els.ui.logoControls.classList.toggle('opacity-50', !active);
+        els.ui.logoControls.classList.toggle('pointer-events-none', !active);
+        scheduleRender();
+    });
+
+    // Logo Props
+    ['Color', 'Size', 'Opacity', 'X', 'Y'].forEach(prop => {
+        const key = `logo${prop}`;
+        const stateKey = prop.toLowerCase();
+        const el = els.inputs[key];
+        if (!el) return;
+        
+        el.addEventListener(prop === 'Color' ? 'change' : 'input', (e) => {
+            let val = e.target.value;
+            if (prop !== 'Color') val = parseInt(val);
+            state.logo[stateKey] = val;
+            scheduleRender();
+        });
+    });
+
+    // File Loading
+    els.fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            state.sourceImage = img;
+            
+            // Resize Canvas
+            const container = document.getElementById('canvas-wrapper');
+            const aspect = img.width / img.height;
+            let finalW = container.clientWidth;
+            let finalH = finalW / aspect;
+            
+            // Max Resolution Cap for Performance
+            const MAX = 2000;
+            let rW = img.width; let rH = img.height;
+            if (rW > MAX || rH > MAX) {
+                const s = Math.min(MAX/rW, MAX/rH);
+                rW *= s; rH *= s;
+            }
+            
+            els.canvas.width = rW;
+            els.canvas.height = rH;
+            
+            // Show Canvas
+            els.noSignal.classList.add('hidden');
+            els.canvas.classList.remove('hidden');
+            
+            // Initial Glitch Data
+            glitchData = generateGlitchData(state.filters.glitch, rW, rH);
+            
+            scheduleRender();
+        };
+        img.src = url;
+    });
+
+    // Save
+    els.saveBtn.addEventListener('click', () => {
+        if (!state.sourceImage) return;
+        const link = document.createElement('a');
+        link.download = `GENSYN-GLITCH-${Date.now()}.png`;
+        link.href = els.canvas.toDataURL('image/png');
+        link.click();
+    });
+
+    // Init
+    function init() {
+        console.log("SYSTEM INITIALIZED");
+    }
+
+    init();
+    </script>
+</body>
 </html>
